@@ -1,7 +1,7 @@
 # Lifegrid
 A conway's game of Life Project, based on Lenia.
 
-[](https://github.com/SFSeeger/Lifegrid/out/0.png)
+[](https://github.com/SFSeeger/Lifegrid/blob/master/out/0.png)
 
 ## Development Settings
 ### Installing Pre-commits
