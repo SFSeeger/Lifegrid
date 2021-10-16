@@ -33,12 +33,6 @@ kernel_form = (
     / radius
     * len(orbitum['b'])
 )
-plt.imsave(
-    'tmp.png',
-    (kernel_form < len(orbitum['b']))
-    * orbitum['b'][np.minimum(kernel_form.astype(int), len(orbitum['b']) - 1)]
-    * sh.generate_bell(kernel_form % 1, 0.5, 0.15),
-)
 # k = (kernel_form < len(orbitum['b'])) * sh.generate_bell(kernel_form, 0.5, 0.15)
 k = (
     (kernel_form < len(orbitum['b']))
@@ -49,5 +43,5 @@ k = sh.trim(k)
 k = k / np.sum(k)
 
 s = Simulation(k, time_step, orbitum['m'], orbitum['s'])
-renderer.step_to_image(A, s)
+renderer.step_to_image(A, s, 2)
 renderer.images_to_video('out.avi', 18)
