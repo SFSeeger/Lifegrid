@@ -6,6 +6,7 @@ from simulation.simulation import *
 from simulation.creatures import creatures
 from simulation.utils import *
 from simulation.utils import Renderer
+from interface import interface
 
 def run():
     sh = Simulation_Helper()
@@ -32,7 +33,12 @@ def run():
 
     #s = Simulation(k, time_step, orbitum['m'], orbitum['s'])
     for i in range(len(km)):
+        data = sh.trim(km[i][0])
         plt.imsave(f"kernel{i}.png", km[i][0])
 
+def render_window():
+    interface.render()
+
 if __name__ == "__main__":
-    run()
+    render_window()
+    #run()
