@@ -15,9 +15,20 @@ class Simulation_Helper:
         """
         bell = lambda x, m, s: np.exp(-(((x - m) / s) ** 2) / 2)
         return bell(x, m, s)
-
+    
     def generate_conway_kernel(self):
         return np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
+
+    def generate_smooth_kernel(self, beta, dx, sizeX, sizeY):
+        midX = sizeX // 2
+        midY = sizeY // 2
+        radius = (np.linalg.norm(np.asarray(np.ogrid[-midX:midX, -midY:midY], dtype=object) + 1) / dx)
+        print(beta)
+        Br = len(beta) * radius
+        kernel = ((Br < len(beta)) * beta[np.minimum(Br.astype(int), len(beta) - 1)]* self.generate_bell(Br % 1, 0.5, 0.15))
+        kernel = kernel / np.sum(kernel)
+        kernel_FFT = np.fft.fft2(kernel)
+        return kernel, kernel_FFT
 
     def trim(self, K):
         mask = K == 0
@@ -35,11 +46,9 @@ class Simulation:
     s: growth function y-axis spread
     """
 
-    def __init__(self, K, T, m, s) -> None:
+    def __init__(self, K, T) -> None:
         self.K = K
         self.T = T
-        self.m = m
-        self.s = s
         self.sh = Simulation_Helper()
 
     def create_field(self, size_x: int, size_y: int):
@@ -60,19 +69,19 @@ class Simulation:
         )
 
     # smooth
-    def smooth_growth_function(self, U):
-        return self.sh.generate_bell(U, self.m, self.s) * 2 - 1
+    def apply_kernel_fft(self, A, K, m, s):
+        world_fft = np.fft.fft2(A)
+        potential = world_fft * K
+        potential = np.fft.fftshift(np.real(np.fft.ifft2(potential)))
 
-    def smooth_step(self, A):
-        return np.clip(
-            A + 1 / self.T * self.smooth_growth_function(self.apply_kernel(A)),
-            0,
-            1,
-        )
+        growth = self.smooth_growth_function(potential, m, s)
 
-    def show_growth_func(self):
+    def smooth_growth_function(self, U, m, s):
+        return self.sh.generate_bell(U, m, s) * 2 - 1
+
+    def show_growth_func(self, u, m):
         plt.plot(
             np.arange(0.0, 1.0, 0.005),
-            self.smooth_growth_function(np.arange(0.0, 1.0, 0.005)),
+            self.smooth_growth_function(np.arange(0.0, 1.0, 0.005), u, m),
         )
         plt.show()
