@@ -2,6 +2,7 @@ from re import M
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy import signal
+from random import randint
 
 
 class Simulation_Helper:
@@ -15,17 +16,26 @@ class Simulation_Helper:
         """
         bell = lambda x, m, s: np.exp(-(((x - m) / s) ** 2) / 2)
         return bell(x, m, s)
-    
+
     def generate_conway_kernel(self):
         return np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
 
     def generate_smooth_kernel(self, beta, dx, sizeX, sizeY):
         midX = sizeX // 2
         midY = sizeY // 2
-        radius = (np.linalg.norm(np.asarray(np.ogrid[-midX:midX, -midY:midY], dtype=object) + 1) / dx)
+        radius = (
+            np.linalg.norm(
+                np.asarray(np.ogrid[-midX:midX, -midY:midY], dtype=object) + 1
+            )
+            / dx
+        )
         print(beta)
         Br = len(beta) * radius
-        kernel = ((Br < len(beta)) * beta[np.minimum(Br.astype(int), len(beta) - 1)]* self.generate_bell(Br % 1, 0.5, 0.15))
+        kernel = (
+            (Br < len(beta))
+            * beta[np.minimum(Br.astype(int), len(beta) - 1)]
+            * self.generate_bell(Br % 1, 0.5, 0.15)
+        )
         kernel = kernel / np.sum(kernel)
         kernel_FFT = np.fft.fft2(kernel)
         return kernel, kernel_FFT
@@ -46,9 +56,7 @@ class Simulation:
     s: growth function y-axis spread
     """
 
-    def __init__(self, K, T) -> None:
-        self.K = K
-        self.T = T
+    def __init__(self) -> None:
         self.sh = Simulation_Helper()
 
     def create_field(self, size_x: int, size_y: int):
@@ -69,11 +77,34 @@ class Simulation:
         )
 
     # smooth
-    def apply_kernel_fft(self, A, K, m, s):
+    def calculate_growth(self, A, K_FFT, m, s):
         world_fft = np.fft.fft2(A)
-        potential = world_fft * K
+        potential = world_fft * K_FFT
         potential = np.fft.fftshift(np.real(np.fft.ifft2(potential)))
 
+        growth = self.smooth_growth_function(potential, m, s)
+
+        return growth, potential
+
+    """
+    def run_automation(self, A, dt, growth):
+
+        h: sum of hk
+
+        new_world = np.clip((A + dt * growth), 0, 1)
+        return new_world
+    """
+
+    def run_layer_automation(self, growth, hk, h):
+        new_world = hk / h * growth
+
+    def run_complex_automation(self, A, dt, layers):
+        layer_sum = layers[0]
+        for _ in range(1, len(layers)):
+            layer_sum += layers[_]
+        new_world = np.clip((A + dt * layer_sum), 0, 1)
+
+    def apply_growth(self, potential, m, s):
         growth = self.smooth_growth_function(potential, m, s)
 
     def smooth_growth_function(self, U, m, s):
