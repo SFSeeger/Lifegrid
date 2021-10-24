@@ -20,25 +20,29 @@ class Simulation_Helper:
     def generate_conway_kernel(self):
         return np.array([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
 
-    def generate_smooth_kernel(self, beta, dx, sizeX, sizeY):
+    def generate_smooth_kernels(self, Ks, R, sizeX, sizeY):
         midX = sizeX // 2
         midY = sizeY // 2
-        radius = (
-            np.linalg.norm(
-                np.asarray(np.ogrid[-midX:midX, -midY:midY], dtype=object) + 1
-            )
-            / dx
-        )
-        print(beta)
-        Br = len(beta) * radius
-        kernel = (
-            (Br < len(beta))
-            * beta[np.minimum(Br.astype(int), len(beta) - 1)]
-            * self.generate_bell(Br % 1, 0.5, 0.15)
-        )
-        kernel = kernel / np.sum(kernel)
-        kernel_FFT = np.fft.fft2(kernel)
-        return kernel, kernel_FFT
+
+        K_forms = [
+            np.linalg.norm(np.ogrid[-midX:midX, -midY:midY])
+            / R
+            * len(K['b'])
+            / K['r']
+            for K in Ks
+        ]
+        kernels = [
+            (D < len(K['b']))
+            * np.asarray(K['b'], dtype=object)[
+                np.minimum(D.astype(int), len(K['b']) - 1)
+            ]
+            * self.generate_bell(D % 1, 0.5, 0.15)
+            for D, K in zip(K_forms, Ks)
+        ]
+        nKs = [K / np.sum(K) for K in kernels]
+
+        K_FFTs = [np.fft.fft2(np.fft.fftshift(K)) for K in nKs]
+        return K_FFTs
 
     def trim(self, K):
         mask = K == 0
@@ -62,57 +66,45 @@ class Simulation:
     def create_field(self, size_x: int, size_y: int):
         return np.zeros((size_x, size_y))
 
-    def apply_kernel(self, A):
-        return signal.convolve2d(A, self.K, mode='same', boundary='wrap')
-
-    def apply_growth(self, A, U):
-        return self.growth_function(A, U)
-
-    def growth_function(self, A, U):
-        return np.logical_or(np.logical_and(A, (U == 2)), (U == 3))
-
-    def step(self, A):
-        return np.clip(
-            self.apply_growth(A, self.apply_kernel(A, self.K)), 0, 1
-        )
-
     # smooth
-    def calculate_growth(self, A, K_FFT, m, s):
-        world_fft = np.fft.fft2(A)
-        potential = world_fft * K_FFT
-        potential = np.fft.fftshift(np.real(np.fft.ifft2(potential)))
+    def calculate_growths(self, As, Ks, K_FFTs):
+        A_ffts = [np.fft.fft2(A) for A in As]
+        potentials = [
+            np.real(np.fft.ifft2(A_ffts[K['c0']] * K_FFT))
+            for K_FFT, K in zip(K_FFTs, Ks)
+        ]
+        growths = [
+            self.smooth_growth_function(U, K['m'], K['s'])
+            for U, K in zip(potentials, Ks)
+        ]
 
-        growth = self.smooth_growth_function(potential, m, s)
+        return growths
 
-        return growth, potential
-
-    """
-    def run_automation(self, A, dt, growth):
-
-        h: sum of hk
-
-        new_world = np.clip((A + dt * growth), 0, 1)
-        return new_world
-    """
-
-    def run_layer_automation(self, growth, hk, h):
-        new_world = hk / h * growth
-
-    def run_complex_automation(self, A, dt, layers):
-        layer_sum = layers[0]
-        for _ in range(1, len(layers)):
-            layer_sum += layers[_]
-        new_world = np.clip((A + dt * layer_sum), 0, 1)
-
-    def apply_growth(self, potential, m, s):
-        growth = self.smooth_growth_function(potential, m, s)
+    def complex_step(self, As, Gs, Ks, T, layers):
+        # Calculate every Layer and their weight
+        Hs = [
+            sum(K['h'] * G for K, G in zip(Ks, Gs) if K['c1'] == c1)
+            for c1 in range(layers)
+        ]
+        As = [np.clip(A + 1 / T * H, 0, 1) for A, H in zip(As, Hs)]
+        return As
 
     def smooth_growth_function(self, U, m, s):
         return self.sh.generate_bell(U, m, s) * 2 - 1
 
-    def show_growth_func(self, u, m):
+    def show_growth_func(self, m, s):
         plt.plot(
             np.arange(0.0, 1.0, 0.005),
-            self.smooth_growth_function(np.arange(0.0, 1.0, 0.005), u, m),
+            self.smooth_growth_function(np.arange(0.0, 1.0, 0.005), m, s),
         )
+        plt.show()
+
+    def show_multiple_growth_func(self, Ks):
+        for K in Ks:
+            plt.plot(
+                np.arange(0.0, 1.0, 0.005),
+                self.smooth_growth_function(
+                    np.arange(0.0, 1.0, 0.005), K['m'], K['s']
+                ),
+            )
         plt.show()
