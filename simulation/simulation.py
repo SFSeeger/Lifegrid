@@ -42,7 +42,7 @@ class Simulation_Helper:
         nKs = [K / np.sum(K) for K in kernels]
 
         K_FFTs = [np.fft.fft2(np.fft.fftshift(K)) for K in nKs]
-        return K_FFTs
+        return K_FFTs, nKs
 
     def trim(self, K):
         mask = K == 0
@@ -67,8 +67,11 @@ class Simulation:
         return np.zeros((size_x, size_y))
 
     # smooth
-    def calculate_growths(self, As, Ks, K_FFTs):
-        A_ffts = [np.fft.fft2(A) for A in As]
+    def calculate_growths(self, As, Ks, K_FFTs, layers):
+        if layers >1:
+            A_ffts = [np.fft.fft2(A) for A in As]
+        else:
+            A_ffts = [np.fft.fft2(As[0])]
         potentials = [
             np.real(np.fft.ifft2(A_ffts[K['c0']] * K_FFT))
             for K_FFT, K in zip(K_FFTs, Ks)
@@ -86,7 +89,10 @@ class Simulation:
             sum(K['h'] * G for K, G in zip(Ks, Gs) if K['c1'] == c1)
             for c1 in range(layers)
         ]
-        As = [np.clip(A + 1 / T * H, 0, 1) for A, H in zip(As, Hs)]
+        if layers > 1:
+            As = [np.clip(A + 1 / T * H, 0, 1) for A, H in zip(As, Hs)]
+        else:
+            As = [np.clip(As[0] + 1 / T * Hs[0], 0, 1)]
         return As
 
     def smooth_growth_function(self, U, m, s):
